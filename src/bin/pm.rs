@@ -1,10 +1,8 @@
 use std::{fs::File, io::{self, Write}, net::TcpListener, process::{Command, Stdio}, thread};
 
 use clap::Parser;
-use tempfile::TempDir;
 
-const ELISP_LIBRARY: &[u8] = include_bytes!("../../resources/pipemacs.el");
-const LIBRARY_FILE_NAME: &str = "pipemacs.el";
+const ELISP_LIBRARY: &str = include_str!("../../resources/pipemacs.el");
 
 #[derive(Parser)]
 struct Arguments {
@@ -50,10 +48,6 @@ fn feed_data_to_emacs(listener: TcpListener) -> anyhow::Result<()> {
 
 fn main() -> anyhow::Result<()> {
     let args = Arguments::parse();
-    let temp_dir = TempDir::with_prefix("pipemacs")?;
-    let library_file_path = temp_dir.path().join(LIBRARY_FILE_NAME);
-    let mut library_file = File::create(&library_file_path)?;
-    library_file.write_all(ELISP_LIBRARY)?;
 
     // Bind to any local address
     let listener = TcpListener::bind("127.0.0.1:0")?;
@@ -78,8 +72,8 @@ fn main() -> anyhow::Result<()> {
         emacs_process.stdin(stdin);
     }
 
-    emacs_process.arg("--load");
-    emacs_process.arg(library_file_path);
+    emacs_process.arg("--eval");
+    emacs_process.arg(ELISP_LIBRARY);
     emacs_process.arg("--eval");
     emacs_process.arg(call_emacs_entry_point(bound_port, args.mode.as_ref(), args.filename.as_ref()));
 

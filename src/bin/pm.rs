@@ -1,26 +1,22 @@
 use std::{fs::File, io::{self, Write}, net::TcpListener, process::{Command, Stdio}, thread};
 
-use clap::Parser;
+use clap::{Arg, ArgAction};
 
 const ELISP_LIBRARY: &str = include_str!("../../resources/pipemacs.el");
 
-#[derive(Parser)]
 struct Arguments {
     /// If true, pass the `-nw` argument to emacs to start in TTY mode.
-    #[arg(long, default_value_t = false)]
     no_window: bool,
 
     /// The mode to use for the buffer in emacs
     ///
     /// If not provided, use fundamental-mode
-    #[arg(short, long)]
     mode: Option<String>,
 
     /// The filename to use for the emacs buffer.
     ///
     /// If none is provided, use a default
-    #[arg(short, long)]
-    filename: Option<String>,
+    buffer_name: Option<String>,
 }
 
 /// Create the elisp function call to pass to emacs
@@ -47,7 +43,17 @@ fn feed_data_to_emacs(listener: TcpListener) -> anyhow::Result<()> {
 
 
 fn main() -> anyhow::Result<()> {
-    let args = Arguments::parse();
+    let matches = clap::Command::new("pm")
+        .arg(Arg::new("no-window").long("no-window").short('n').action(ArgAction::SetTrue))
+        .arg(Arg::new("mode").long("mode").short('m').action(ArgAction::Set))
+        .arg(Arg::new("buffer-name").long("buffer-name").short('b').action(ArgAction::Set))
+        .get_matches();
+
+    let args = Arguments {
+        no_window: matches.get_flag("no-window"),
+        mode: matches.get_one::<String>("mode").cloned(),
+        buffer_name: matches.get_one::<String>("buffer-name").cloned(),
+    };
 
     // Bind to any local address
     let listener = TcpListener::bind("127.0.0.1:0")?;
@@ -75,7 +81,7 @@ fn main() -> anyhow::Result<()> {
     emacs_process.arg("--eval");
     emacs_process.arg(ELISP_LIBRARY);
     emacs_process.arg("--eval");
-    emacs_process.arg(call_emacs_entry_point(bound_port, args.mode.as_ref(), args.filename.as_ref()));
+    emacs_process.arg(call_emacs_entry_point(bound_port, args.mode.as_ref(), args.buffer_name.as_ref()));
 
 
     let mut child_emacs = emacs_process.spawn()?;

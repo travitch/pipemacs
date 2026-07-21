@@ -102,6 +102,12 @@ fn main() -> anyhow::Result<()> {
         filenames: matches.get_many("filename").map(|vs| vs.cloned().collect()).unwrap_or_else(|| Vec::new()),
     };
 
+    if args.writeback && args.client {
+        // The writeback is implemented as a kill buffer hook that will currently not play nicely
+        // with client mode.  That could potentially be fixed in the future.
+        anyhow::bail!("pipemacs cannot write back to standard output in client mode");
+    }
+
     let server_state = create_listener(&args)?;
 
     let mut emacs_process = if args.client {

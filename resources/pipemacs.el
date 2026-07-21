@@ -33,9 +33,10 @@ to be valid utf-8."
                                                    :service port)))
       (switch-to-buffer target-buffer)
       (funcall (intern mode))
-      (add-hook 'kill-buffer-hook (lambda ()
-                                   (with-current-buffer target-buffer
-                                     (process-send-string network-process (buffer-string))
-                                     (delete-process network-process)))))))
+      (when writeback
+        (add-hook 'kill-buffer-hook (lambda ()
+                                      (with-current-buffer target-buffer
+                                        (process-send-string network-process (buffer-string))
+                                        (delete-process network-process))))))))
 
 ;;; pipemacs.el ends here

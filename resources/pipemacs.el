@@ -12,7 +12,9 @@
     "Read INPUT from the given process and append it to BUFFER."
 
     (with-current-buffer buffer
-      (insert input)))
+      (save-excursion
+        (goto-char (point-max))
+        (insert input))))
 
   (defun pipemacs-read-data-into-buffer (port mode buffer-name)
     "Read data from the given PORT on localhost into BUFFER-NAME.

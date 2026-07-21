@@ -67,11 +67,16 @@ fn create_listener(args: &Arguments) -> anyhow::Result<Option<ServerState>> {
 
 fn main() -> anyhow::Result<()> {
     let matches = clap::Command::new("pm")
-        .arg(Arg::new("no-window").long("no-window").short('n').action(ArgAction::SetTrue))
-        .arg(Arg::new("client").long("client").short('c').action(ArgAction::SetTrue))
-        .arg(Arg::new("mode").long("mode").short('m').action(ArgAction::Set))
-        .arg(Arg::new("buffer-name").long("buffer-name").short('b').action(ArgAction::Set))
-        .arg(Arg::new("filename").action(ArgAction::Append))
+        .arg(Arg::new("no-window").long("no-window").short('n').action(ArgAction::SetTrue)
+            .help("Start a TTY emacs frame (instead of a GUI frame)"))
+        .arg(Arg::new("client").long("client").short('c').action(ArgAction::SetTrue)
+            .help("Connect to a running emacs server using emacsclient"))
+        .arg(Arg::new("mode").long("mode").short('m').action(ArgAction::Set)
+            .help("Specify the mode to use for the piped buffer (default: fundamental-mode)"))
+        .arg(Arg::new("buffer-name").long("buffer-name").short('b').action(ArgAction::Set)
+            .help("Specify the name to assign to the buffer containing the piped content (default: pipemacs-input)"))
+        .arg(Arg::new("filename").action(ArgAction::Append)
+            .help("Files to open in emacs; if this is specified, do not redirect stdin to emacs"))
         .get_matches();
 
     let args = Arguments {

@@ -13,24 +13,17 @@ jq . file.json | pm --no-window --mode json-mode
 ```
 
 ```
-Usage: pm [OPTIONS]
+Usage: pm [OPTIONS] [filename]...
+
+Arguments:
+  [filename]...  Files to open in emacs; if this is specified, do not redirect stdin to emacs
 
 Options:
-      --no-window
-          If true, pass the `-nw` argument to emacs to start in TTY mode
-
-  -m, --mode <MODE>
-          The mode to use for the buffer in emacs
-
-          If not provided, use fundamental-mode
-
-  -f, --filename <FILENAME>
-          The filename to use for the emacs buffer.
-
-          If none is provided, use a default
-
-  -h, --help
-          Print help (see a summary with '-h')
+  -n, --no-window                  Start a TTY emacs frame (instead of a GUI frame)
+  -c, --client                     Connect to a running emacs server using emacsclient
+  -m, --mode <mode>                Specify the mode to use for the piped buffer (default: fundamental-mode)
+  -b, --buffer-name <buffer-name>  Specify the name to assign to the buffer containing the piped content (default: pipemacs-input)
+  -h, --help                       Print help
 ```
 
 # Related Work

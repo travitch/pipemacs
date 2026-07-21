@@ -8,6 +8,9 @@ struct Arguments {
     /// If true, pass the `-nw` argument to emacs to start in TTY mode.
     no_window: bool,
 
+    /// If true, use emacsclient to connect to an emacs server instead of starting a new instance
+    client: bool,
+
     /// The mode to use for the buffer in emacs
     ///
     /// If not provided, use fundamental-mode
@@ -65,6 +68,7 @@ fn create_listener(args: &Arguments) -> anyhow::Result<Option<ServerState>> {
 fn main() -> anyhow::Result<()> {
     let matches = clap::Command::new("pm")
         .arg(Arg::new("no-window").long("no-window").short('n').action(ArgAction::SetTrue))
+        .arg(Arg::new("client").long("client").short('c').action(ArgAction::SetTrue))
         .arg(Arg::new("mode").long("mode").short('m').action(ArgAction::Set))
         .arg(Arg::new("buffer-name").long("buffer-name").short('b').action(ArgAction::Set))
         .arg(Arg::new("filename").action(ArgAction::Append))
@@ -72,6 +76,7 @@ fn main() -> anyhow::Result<()> {
 
     let args = Arguments {
         no_window: matches.get_flag("no-window"),
+        client: matches.get_flag("client"),
         mode: matches.get_one::<String>("mode").cloned(),
         buffer_name: matches.get_one::<String>("buffer-name").cloned(),
         filenames: matches.get_many("filename").map(|vs| vs.cloned().collect()).unwrap_or_else(|| Vec::new()),
@@ -79,7 +84,11 @@ fn main() -> anyhow::Result<()> {
 
     let server_state = create_listener(&args)?;
 
-    let mut emacs_process = Command::new("emacs");
+    let mut emacs_process = if args.client {
+        Command::new("emacsclient")
+    } else {
+        Command::new("emacs")
+    };
     if args.no_window {
         emacs_process.arg("-nw");
 

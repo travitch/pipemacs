@@ -16,19 +16,26 @@
         (goto-char (point-max))
         (insert input))))
 
-  (defun pipemacs-read-data-into-buffer (port mode buffer-name)
+  (defun pipemacs-read-data-into-buffer (port mode buffer-name writeback)
     "Read data from the given PORT on localhost into BUFFER-NAME.
 
 Enable the major mode MODE in the new buffer.
 
+If WRITEBACK is t, write the contents of the buffer back to the
+server when emacs is killed.
+
 Note that input is sent line-by-line, so each chunk is guaranteed
 to be valid utf-8."
     (let* ((target-buffer (get-buffer-create buffer-name))
-           (_network-process (make-network-process :name "pipemacs-network-proc"
+           (network-process (make-network-process :name "pipemacs-network-proc"
                                                    :host "127.0.0.1"
                                                    :filter (lambda (_proc input) (pipemacs--process-filter target-buffer input))
                                                    :service port)))
       (switch-to-buffer target-buffer)
-      (funcall (intern mode)))))
+      (funcall (intern mode))
+      (add-hook 'kill-buffer-hook (lambda ()
+                                   (with-current-buffer target-buffer
+                                     (process-send-string network-process (buffer-string))
+                                     (delete-process network-process)))))))
 
 ;;; pipemacs.el ends here

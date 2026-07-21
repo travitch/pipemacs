@@ -21,6 +21,7 @@ Arguments:
 Options:
   -n, --no-window                  Start a TTY emacs frame (instead of a GUI frame)
   -c, --client                     Connect to a running emacs server using emacsclient
+  -w, --writeback                  Write the contents of the emacs buffer back to standard output
   -m, --mode <mode>                Specify the mode to use for the piped buffer (default: fundamental-mode)
   -b, --buffer-name <buffer-name>  Specify the name to assign to the buffer containing the piped content (default: pipemacs-input)
   -h, --help                       Print help

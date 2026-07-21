@@ -13,17 +13,22 @@ struct Arguments {
     /// If not provided, use fundamental-mode
     mode: Option<String>,
 
-    /// The filename to use for the emacs buffer.
+    /// The name to use for the emacs buffer.
     ///
     /// If none is provided, use a default
     buffer_name: Option<String>,
+
+    /// The filenames to open in emacs.
+    ///
+    /// Passing this disables the standard input collecting mode.
+    filenames: Vec<String>,
 }
 
 /// Create the elisp function call to pass to emacs
 fn call_emacs_entry_point(bound_port: u16, mode: Option<&String>, buffer_name: Option<&String>) -> String {
-    let mode_arg = mode.map(|s| format!("\"{}\"", s)).unwrap_or_else(|| "fundamental-mode".into());
-    let buffer_name_arg = buffer_name.map(|s| format!("\"{}\"", s)).unwrap_or_else(|| "\"pipemacs-input\"".into());
-    format!("(pipemacs-read-data-into-buffer {} {} {})", bound_port, mode_arg, buffer_name_arg)
+    let mode_arg = mode.map(|s| format!("{}", s)).unwrap_or_else(|| "fundamental-mode".into());
+    let buffer_name_arg = buffer_name.map(|s| format!("{}", s)).unwrap_or_else(|| "pipemacs-input".into());
+    format!("(pipemacs-read-data-into-buffer {} \"{}\" \"{}\")", bound_port, mode_arg, buffer_name_arg)
 }
 
 /// Copy all bytes from stdin to the first client that connects to the TCP listener.
@@ -41,31 +46,38 @@ fn feed_data_to_emacs(listener: TcpListener) -> anyhow::Result<()> {
     Ok(())
 }
 
+struct ServerState {
+    listener: TcpListener,
+    bound_port: u16,
+}
+
+fn create_listener(args: &Arguments) -> anyhow::Result<Option<ServerState>> {
+    if args.filenames.is_empty() {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let bound_port = listener.local_addr()?.port();
+
+        Ok(Some(ServerState {listener, bound_port }))
+    } else {
+        Ok(None)
+    }
+}
 
 fn main() -> anyhow::Result<()> {
     let matches = clap::Command::new("pm")
         .arg(Arg::new("no-window").long("no-window").short('n').action(ArgAction::SetTrue))
         .arg(Arg::new("mode").long("mode").short('m').action(ArgAction::Set))
         .arg(Arg::new("buffer-name").long("buffer-name").short('b').action(ArgAction::Set))
+        .arg(Arg::new("filename").action(ArgAction::Append))
         .get_matches();
 
     let args = Arguments {
         no_window: matches.get_flag("no-window"),
         mode: matches.get_one::<String>("mode").cloned(),
         buffer_name: matches.get_one::<String>("buffer-name").cloned(),
+        filenames: matches.get_many("filename").map(|vs| vs.cloned().collect()).unwrap_or_else(|| Vec::new()),
     };
 
-    // Bind to any local address
-    let listener = TcpListener::bind("127.0.0.1:0")?;
-    let bound_port = listener.local_addr()?.port();
-    let data_thread = thread::spawn(move || {
-        match feed_data_to_emacs(listener) {
-            Ok(()) => {}
-            Err(e) => {
-                panic!("Error feeding data to emacs {}", e);
-            }
-        }
-    });
+    let server_state = create_listener(&args)?;
 
     let mut emacs_process = Command::new("emacs");
     if args.no_window {
@@ -78,15 +90,37 @@ fn main() -> anyhow::Result<()> {
         emacs_process.stdin(stdin);
     }
 
-    emacs_process.arg("--eval");
-    emacs_process.arg(ELISP_LIBRARY);
-    emacs_process.arg("--eval");
-    emacs_process.arg(call_emacs_entry_point(bound_port, args.mode.as_ref(), args.buffer_name.as_ref()));
+    if let Some(server_state) = &server_state {
+        emacs_process.arg("--eval");
+        emacs_process.arg(ELISP_LIBRARY);
+        emacs_process.arg("--eval");
+        emacs_process.arg(call_emacs_entry_point(server_state.bound_port, args.mode.as_ref(), args.buffer_name.as_ref()));
+    } else {
+        for filename in &args.filenames {
+            emacs_process.arg(filename);
+        }
+    }
 
+    let mut data_thread_handle = None;
+    // Bind to any local address, but only if we are going to need to send data over the socket
+    if let Some(server_state) = server_state {
+        let handle = thread::spawn(move || {
+            match feed_data_to_emacs(server_state.listener) {
+                Ok(()) => {}
+                Err(e) => {
+                    panic!("Error feeding data to emacs {}", e);
+                }
+            }
+        });
+
+        data_thread_handle = Some(handle);
+    }
 
     let mut child_emacs = emacs_process.spawn()?;
     child_emacs.wait()?;
-    data_thread.join().expect("Could not join the data thread");
+    if let Some(handle) = data_thread_handle {
+        handle.join().expect("Could not join the data thread");
+    }
 
     Ok(())
 }

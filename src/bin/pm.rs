@@ -43,12 +43,7 @@ fn call_emacs_entry_point(bound_port: u16, mode: Option<&String>, buffer_name: O
 fn feed_data_to_emacs(listener: TcpListener, writeback: bool) -> anyhow::Result<Option<String>> {
     // This blocks until emacs connects to us, so we know it is ready once we get a stream.
     let (mut stream, _sockaddr) = listener.accept()?;
-
-    for line in io::stdin().lines() {
-        stream.write_all(line?.as_bytes())?;
-        stream.write_all("\n".as_bytes())?;
-    }
-
+    io::copy(&mut io::stdin().lock(), &mut stream)?;
     stream.flush()?;
 
     if writeback {
